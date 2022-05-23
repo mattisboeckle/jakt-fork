@@ -253,6 +253,7 @@ pub enum ParsedExpression {
     NumericConstant(NumericConstant, Span),
     QuotedString(String, Span),
     CharacterLiteral(char, Span),
+    ByteLiteral(u8, Span),
     Array(Vec<ParsedExpression>, Option<Box<ParsedExpression>>, Span),
     Dictionary(Vec<(ParsedExpression, ParsedExpression)>, Span),
     Set(Vec<ParsedExpression>, Span),
@@ -295,6 +296,7 @@ impl ParsedExpression {
             ParsedExpression::Boolean(_, span) => *span,
             ParsedExpression::NumericConstant(_, span) => *span,
             ParsedExpression::QuotedString(_, span) => *span,
+            ParsedExpression::ByteLiteral(_, span) => *span,
             ParsedExpression::CharacterLiteral(_, span) => *span,
             ParsedExpression::Array(_, _, span) => *span,
             ParsedExpression::Dictionary(_, span) => *span,
@@ -2675,6 +2677,14 @@ pub fn parse_operand(tokens: &[Token], index: &mut usize) -> (ParsedExpression, 
                 ParsedExpression::Garbage(span)
             }
         }
+        TokenContents::SingleQuotedByteString(c) => {
+            *index += 1;
+            if let Some(first) = c.chars().next() {
+                ParsedExpression::ByteLiteral(first as u8, span)
+            } else {
+                ParsedExpression::Garbage(span)
+            }
+        }
         _ => {
             trace!("ERROR: unsupported expression");
             error = error.or(Some(JaktError::ParserError(
@@ -4005,6 +4015,7 @@ pub fn parse_typename(tokens: &[Token], index: &mut usize) -> (ParsedType, Optio
             if name == "raw" || name == "weak" {
                 *index += 1;
                 if *index < tokens.len() {
+                    let typename_start = tokens[*index].span;
                     let (child_parsed_type, err) = parse_typename(tokens, index);
                     error = error.or(err);
 
@@ -4018,14 +4029,30 @@ pub fn parse_typename(tokens: &[Token], index: &mut usize) -> (ParsedType, Optio
                             },
                         );
                     } else if name == "weak" {
-                        unchecked_type = ParsedType::WeakPtr(
-                            Box::new(child_parsed_type),
-                            Span {
-                                file_id: start.file_id,
-                                start: start.start,
-                                end: tokens[*index - 1].span.end,
-                            },
-                        );
+                        match child_parsed_type {
+                            ParsedType::Optional(optional_type, ..) => {
+                                unchecked_type = ParsedType::WeakPtr(
+                                    optional_type,
+                                    Span {
+                                        file_id: start.file_id,
+                                        start: start.start,
+                                        end: tokens[*index - 1].span.end,
+                                    },
+                                );
+                            }
+                            _ => {
+                                trace!("ERROR: missing `?` after weak pointer type name");
+
+                                error = error.or(Some(JaktError::ParserError(
+                                    "missing `?` after weak pointer type name".to_string(),
+                                    Span {
+                                        file_id: typename_start.file_id,
+                                        start: typename_start.start,
+                                        end: tokens[*index - 1].span.end,
+                                    },
+                                )));
+                            }
+                        }
                     }
                 }
             } else {
