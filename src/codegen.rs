@@ -1292,21 +1292,6 @@ fn codegen_statement(indent: usize, stmt: &CheckedStatement, project: &Project) 
         CheckedStatement::Break => {
             output.push_str("break;");
         }
-        CheckedStatement::For(iterator_name, range_expr, block) => {
-            output.push_str("{ auto&& _range = ");
-            output.push_str(&codegen_expr(indent, range_expr, project));
-            output.push_str("; for(auto ");
-            output.push_str(iterator_name);
-            output.push(' ');
-            output.push_str(" = _range.start;");
-            output.push_str(iterator_name);
-            output.push_str("!= _range.end;");
-            output.push_str(iterator_name);
-            output.push_str("++");
-            output.push_str(") {");
-            output.push_str(&codegen_block(indent, block, project));
-            output.push_str("}}");
-        }
         CheckedStatement::Expression(expr) => {
             let expr = codegen_expr(indent, expr, project);
             output.push_str(&expr);
@@ -1483,7 +1468,7 @@ fn codegen_expr(indent: usize, expr: &CheckedExpression, project: &Project) -> S
             output.push_str(")})");
         }
         CheckedExpression::OptionalNone(_, _) => {
-            output.push_str("{}");
+            output.push_str("JaktInternal::OptionalNone()");
         }
         CheckedExpression::OptionalSome(expr, _, _) => {
             output.push('(');

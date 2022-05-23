@@ -90,6 +90,20 @@ struct Range {
     using IndexType = T;
     T start {};
     T end {};
+    T current {};
+
+    Range(T start, T end)
+        : start(start)
+        , end(end)
+        , current(start)
+    {
+    }
+
+    Optional<T> next() {
+        if (current == end)
+            return {};
+        return current++;
+    }
 };
 
 namespace JaktInternal {
@@ -99,6 +113,8 @@ constexpr auto continue_on_panic = true;
 #else
 constexpr auto continue_on_panic = false;
 #endif
+
+using OptionalNone = AK::NullOptional;
 
 ErrorOr<int> main(Array<String>);
 
